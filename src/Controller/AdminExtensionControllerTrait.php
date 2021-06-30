@@ -5,6 +5,7 @@ namespace AlterPHP\EasyAdminExtensionBundle\Controller;
 use AlterPHP\EasyAdminExtensionBundle\Security\AdminAuthorizationChecker;
 use EasyCorp\Bundle\EasyAdminBundle\Event\EasyAdminEvents;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 trait AdminExtensionControllerTrait
 {
@@ -32,12 +33,11 @@ trait AdminExtensionControllerTrait
         $baseMasterRequestUri = !$this->request->isXmlHttpRequest()
             ? $this->get('request_stack')->getMasterRequest()->getUri()
             : $this->request->headers->get('referer');
-        \parse_str(\parse_url($baseMasterRequestUri, PHP_URL_QUERY), $queryParameters);
-        unset($queryParameters['referer']);
-        $masterRequestUri = \sprintf('%s?%s', \strtok($baseMasterRequestUri, '?'), \http_build_query($queryParameters));
+
+        $masterRequestUri = $this->removeRefererQueryParameter($baseMasterRequestUri);
 
         $requestParameters = $this->request->query->all();
-        $requestParameters['referer'] = urlencode($masterRequestUri);
+        $requestParameters['referer'] = $masterRequestUri;
 
         $viewVars = [
             'paginator' => $paginator,
@@ -116,5 +116,24 @@ trait AdminExtensionControllerTrait
         }
 
         return new JsonResponse(['html' => $this->renderView($templatePath, $parameters)]);
+    }
+
+    /**
+     * @return RedirectResponse
+     */
+    protected function redirectToReferrer()
+    {
+        $refererUrl = $this->request->query->get('referer', '');
+        $refererUrl = $this->removeRefererQueryParameter($refererUrl);
+        $this->request->query->set('referer', $refererUrl);
+
+        return parent::redirectToReferrer();
+    }
+
+    private function removeRefererQueryParameter(string $url): string {
+        $urlParameters = parse_url($url, PHP_URL_QUERY);
+        parse_str($urlParameters, $queryParameters);
+        unset($queryParameters['referer']);
+        return \sprintf('%s?%s', \strtok($url, '?'), \http_build_query($queryParameters));
     }
 }
